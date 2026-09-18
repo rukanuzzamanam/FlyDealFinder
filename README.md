@@ -1,36 +1,242 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlyDealFinder
 
-## Getting Started
+**Find cheap flights anywhere in the world.**
 
-First, run the development server:
+FlyDealFinder is a flight-deal discovery MVP built around one core question:
+*"I don't know where I want to go — show me the cheapest places I can fly."*
+Users pick a departure airport, optionally pick "Anywhere" as the
+destination, and get back real, live fares sourced from the
+[Duffel Flights API](https://duffel.com/docs/api).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Table of contents
+
+- [Project overview](#project-overview)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Environment variables](#environment-variables)
+- [Duffel setup](#duffel-setup)
+- [Database setup](#database-setup)
+- [Local development](#local-development)
+- [Testing](#testing)
+- [Production build & deployment](#production-build--deployment)
+- [How to add destinations](#how-to-add-destinations)
+- [How to add another flight provider](#how-to-add-another-flight-provider)
+- [Known limitations](#known-limitations)
+
+## Project overview
+
+- **Search** — one-way/return search between two specific airports.
+- **Anywhere search** — search a configurable batch of destinations
+  concurrently and show the cheapest fare to each.
+- **Sort & filter** — cheapest / fastest / fewest stops / departure time;
+  price, stops, airline, and time-of-day filters.
+- **Price alerts** — save a target price to a Postgres table (email
+  notifications are not implemented yet — see [Known limitations](#known-limitations)).
+- **Admin foundation** — a Basic-Auth-protected `/admin` page listing
+  configured destinations and integration status.
+
+No flight price is ever invented. If a live search fails or the provider
+isn't configured, the UI shows an empty state, never a fake number.
+
+## Architecture
+
+See [`docs/architecture.md`](docs/architecture.md) for the full breakdown.
+In short:
+
+```
+UI (Client Components)
+   │  fetch()
+   ▼
+API routes (src/app/api/**)     — validate input (Zod), rate limit, cache
+   │
+   ▼
+FlightProvider interface (src/lib/flight-providers/types.ts)
+   │
+   ▼
+DuffelFlightProvider             — the only implementation today
+   │
+   ▼
+Duffel API (https://api.duffel.com)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The UI and API routes only ever depend on the generic `FlightProvider`
+interface and the app's own normalized `FlightResult` type — never on
+Duffel's response shape directly. That's what makes it possible to add a
+second provider later without touching the frontend.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Installation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requires Node.js 20+ and npm.
 
-## Learn More
+```bash
+npm install
+cp .env.example .env.local
+# fill in .env.local — see "Environment variables" below
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Set these in `.env.local` (never committed — see `.gitignore`).
 
-## Deploy on Vercel
+| Variable | Required | Description |
+|---|---|---|
+| `DUFFEL_API_TOKEN` | Yes, for real search results | Server-side only Duffel access token. Without it, search endpoints return a friendly 503 and the homepage deals section shows an empty state — the app still runs. |
+| `NEXT_PUBLIC_SITE_URL` | Recommended | Public site URL used for metadata, Open Graph tags, and the sitemap. No trailing slash. |
+| `DATABASE_URL` | Optional | Reserved for tooling (e.g. a migration runner) that expects a standard Postgres connection string. The app itself talks to Postgres via Supabase's client, not this variable directly. |
+| `SUPABASE_URL` | Optional | Supabase project URL. Without it, destination management falls back to the static list in `src/lib/destinations.ts`, and price alerts return a 503. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional | **Server-only** service role key (bypasses RLS). Never exposed to the client — see `src/lib/db/supabase.ts`. |
+| `ADMIN_PASSWORD` | Optional | Basic-Auth password for `/admin`. If unset, `/admin` returns 503 (fails closed, not open). |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`DUFFEL_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` are read only in
+server-side code (API routes, `src/lib/db/*`, `src/lib/flight-providers/*`)
+and are never included in the client JS bundle — Next.js only exposes
+`NEXT_PUBLIC_*` variables to the browser.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Duffel setup
+
+1. Create a Duffel account at https://app.duffel.com and switch to
+   **test mode** for development.
+2. Go to **Developers → Access tokens** and create a token.
+3. Put it in `.env.local` as `DUFFEL_API_TOKEN`.
+
+See [`docs/duffel-integration.md`](docs/duffel-integration.md) for exactly
+which Duffel endpoints and fields this app uses, and what to check first if
+something in the Duffel integration needs updating.
+
+**Note on booking:** Duffel does not provide a booking deep-link/affiliate
+URL on an offer — completing a purchase requires creating an Order via the
+API with payment details. This MVP does not implement order creation (see
+[Known limitations](#known-limitations)), so `bookingUrl` is `null` for
+every result today.
+
+## Database setup
+
+The app runs without a database — flight search, Anywhere search, and the
+homepage deals section all work with zero DB configuration. A database is
+only needed for **price alerts** and for **managing destinations without a
+redeploy**.
+
+1. Create a Supabase project (or point at any Postgres instance and adapt
+   `src/lib/db/supabase.ts` if not using Supabase).
+2. Run the migrations in order against your database:
+   ```bash
+   # via the Supabase SQL editor, or `psql`, or the Supabase CLI:
+   supabase/migrations/0001_init.sql
+   supabase/migrations/0002_seed_destinations.sql
+   ```
+3. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`.
+
+Tables created: `users`, `destinations`, `searches`, `price_alerts`. See
+the migration file for exact columns and indexes.
+
+## Local development
+
+```bash
+npm run dev          # start the dev server
+npm run lint          # ESLint
+npx tsc --noEmit      # TypeScript check
+npm run test          # run the test suite once
+npm run test:watch    # watch mode
+```
+
+## Testing
+
+`npm run test` runs the Vitest suite covering the app's core business
+logic (not UI rendering):
+
+- Zod validation schemas (dates, past-date rejection, origin/destination
+  equality, passenger limits, price alert email/price).
+- Duration parsing/formatting and price/date formatting.
+- Sorting (cheapest / fastest / fewest stops / departure time) and
+  filtering (price, stops, airline, time-of-day) — including that they
+  compose with AND semantics and don't mutate their input.
+- `DuffelFlightProvider` offer normalization (via a mocked `fetch`):
+  correct field mapping, stop counting from segment count, price parsing,
+  and mapping of Duffel HTTP error statuses (422/429/etc.) to typed
+  `FlightProviderError` codes.
+- `searchAnywhere`: sorts by cheapest price, excludes the origin airport,
+  keeps going when one destination search fails or times out, respects a
+  max-price filter, and bounds concurrent provider calls.
+
+## Production build & deployment
+
+```bash
+npm run build
+npm run start
+```
+
+`npm run build` must succeed with zero TypeScript errors before deploying.
+
+Deployment is set up for **Vercel** — see
+[`docs/deployment.md`](docs/deployment.md) for the step-by-step guide,
+including which environment variables to set in the Vercel dashboard.
+
+## How to add destinations
+
+The "Anywhere" destination list lives in two places that should stay in
+sync:
+
+1. `src/lib/destinations.ts` — the static fallback, always available.
+2. `supabase/migrations/0002_seed_destinations.sql` — seeds the
+   `destinations` table, used instead of the static list once Supabase is
+   configured (see `src/lib/db/destinations.ts`).
+
+To add a destination:
+
+- Append an entry to `DEFAULT_DESTINATIONS` in `src/lib/destinations.ts`
+  (`id`, `city`, `country`, `airportCode`, `airportName`, `region`, `emoji`).
+- If a database is configured, insert the same row into `destinations`
+  (via the seed migration, the Supabase SQL editor, or a future admin
+  form — `/admin` currently only lists destinations, it doesn't edit them
+  yet).
+
+`ANYWHERE_SEARCH_BATCH_LIMIT` in `src/lib/destinations.ts` caps how many
+destinations a single Anywhere search fans out to; raise it once caching
+and/or a background job queue are in place for larger destination lists.
+
+## How to add another flight provider
+
+1. Implement the `FlightProvider` interface
+   (`src/lib/flight-providers/types.ts`):
+   ```ts
+   interface FlightProvider {
+     readonly name: string;
+     searchFlights(params: FlightSearchParams): Promise<FlightSearchResult>;
+   }
+   ```
+   Your implementation is responsible for mapping the provider's response
+   into the app's normalized `FlightResult` shape (`src/lib/types.ts`) —
+   see `src/lib/flight-providers/duffel.ts` for the reference
+   implementation.
+2. Register it in `src/lib/flight-providers/index.ts`'s
+   `getFlightProvider()` — e.g. branch on a `FLIGHT_PROVIDER` env var to
+   choose between providers, or wrap several in a fan-out provider that
+   merges and de-dupes results.
+
+Nothing outside `src/lib/flight-providers/` needs to change: API routes,
+`searchAnywhere`, and every UI component only ever see `FlightResult` /
+`FlightSearchResult`.
+
+## Known limitations
+
+- **No booking flow.** Duffel has no deep-link/affiliate URL; completing a
+  purchase requires creating an Order via the API. This MVP surfaces
+  search results only — `bookingUrl` is always `null`. See
+  `docs/duffel-integration.md`.
+- **No price alert notifications.** Alerts are stored in `price_alerts`
+  but nothing checks fares against them yet — no scheduled job/worker is
+  implemented (per the brief, this was intentionally deferred; the schema
+  is ready for one — see `docs/architecture.md`).
+- **In-memory cache & rate limiter.** Both are per-instance
+  (`src/lib/cache.ts`, `src/lib/rate-limit.ts`) — fine for a single-instance
+  MVP deployment, not a substitute for Redis/Upstash + an edge rate limiter
+  at real scale.
+- **No airport autocomplete.** "From"/"To" are `<select>` dropdowns backed
+  by a curated list (`src/lib/airports.ts`, `src/lib/destinations.ts`), not
+  a full airport database with search-as-you-type.
+- **English/AUD-centric formatting.** Currency/date formatting defaults to
+  `en-AU`; the price shown is whatever `total_currency` Duffel returns for
+  that offer (not converted).
