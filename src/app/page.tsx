@@ -1,69 +1,100 @@
-import Image from "next/image";
+import { Suspense } from "react";
+import { DestinationCard } from "@/components/DestinationCard";
+import { EmptyState } from "@/components/EmptyState";
+import { PriceAlertForm } from "@/components/PriceAlertForm";
+import { SearchForm } from "@/components/SearchForm";
+import { DEFAULT_ORIGIN } from "@/lib/airports";
+import { getHomepageDeals } from "@/lib/homepage-deals";
 
-export default function Home() {
+// Revalidate periodically (ISR) rather than fetching live fares on every
+// request or freezing them forever at build time — keeps the homepage fast
+// while still showing real, reasonably fresh prices.
+export const revalidate = 1800; // 30 minutes
+
+function addDaysIso(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <>
+      <section className="bg-gradient-to-b from-sky-50 to-white px-4 pb-12 pt-14 sm:px-6 sm:pt-20 dark:from-slate-900 dark:to-slate-950">
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 text-center">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+            Find Cheap Flights Anywhere
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="max-w-xl text-base text-slate-600 sm:text-lg dark:text-slate-300">
+            Search thousands of flight options and discover where you can travel for less.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="mx-auto mt-8 max-w-3xl">
+          <SearchForm initialOrigin={DEFAULT_ORIGIN} />
         </div>
-      </main>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
+        <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
+          🔥 Cheap Flights From Sydney
+        </h2>
+        <Suspense fallback={<DealsSkeleton />}>
+          <HomeDeals />
+        </Suspense>
+      </section>
+
+      <section
+        id="price-alerts"
+        className="mx-auto w-full max-w-3xl scroll-mt-20 px-4 py-12 sm:px-6"
+      >
+        <h2 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white">Price Alert</h2>
+        <p className="mb-6 text-sm text-slate-600 dark:text-slate-300">
+          Tell us where you want to go and your target price — we&apos;ll email you when fares drop.
+        </p>
+        <PriceAlertForm />
+      </section>
+    </>
+  );
+}
+
+async function HomeDeals() {
+  const departureDate = addDaysIso(30);
+  const returnDate = addDaysIso(37);
+  const deals = await getHomepageDeals(DEFAULT_ORIGIN, departureDate, returnDate);
+
+  if (deals.length === 0) {
+    return (
+      <EmptyState
+        title="Live deals aren't available right now"
+        message="We couldn't load live fares from Sydney at the moment. Try searching directly above, or check back shortly."
+      />
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {deals.map((deal) => (
+        <DestinationCard
+          key={deal.destination.id}
+          deal={deal}
+          origin={DEFAULT_ORIGIN}
+          departureDate={departureDate}
+          returnDate={returnDate}
+          adults={1}
+          childrenCount={0}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DealsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+      ))}
     </div>
   );
 }
