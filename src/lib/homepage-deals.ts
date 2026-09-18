@@ -57,7 +57,8 @@ export async function getHomepageDeals(
         currency: cheapest.currency,
         sampleFlight: cheapest,
       };
-    } catch {
+    } catch (err) {
+      console.error(`Homepage deal search failed for ${destination.airportCode}:`, err);
       return null;
     }
   });
@@ -66,6 +67,11 @@ export async function getHomepageDeals(
     .filter((d): d is DestinationDeal => d !== null)
     .sort((a, b) => (a.cheapestPrice ?? Infinity) - (b.cheapestPrice ?? Infinity));
 
-  flightSearchCache.set(cacheKey, filtered, HOMEPAGE_CACHE_TTL_MS);
+  // Only cache a non-empty result. Caching an all-failed batch for the full
+  // TTL would "stick" a transient outage as "no deals" for 30 minutes even
+  // after the provider recovers.
+  if (filtered.length > 0) {
+    flightSearchCache.set(cacheKey, filtered, HOMEPAGE_CACHE_TTL_MS);
+  }
   return filtered;
 }

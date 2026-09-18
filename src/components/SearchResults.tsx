@@ -8,10 +8,11 @@ import { FiltersPanel } from "@/components/FiltersPanel";
 import { FlightCard } from "@/components/FlightCard";
 import { LoadingState } from "@/components/LoadingState";
 import { SortBar } from "@/components/SortBar";
+import type { BookingMode } from "@/lib/booking-providers";
 import { POPULAR_ORIGINS } from "@/lib/airports";
 import { track } from "@/lib/analytics";
 import { DEFAULT_DESTINATIONS } from "@/lib/destinations";
-import type { AnywhereSearchResult, FlightResult, FlightSearchResult } from "@/lib/types";
+import type { AnywhereSearchResult, CabinClass, FlightResult, FlightSearchResult } from "@/lib/types";
 import {
   filterResults,
   getAvailableAirlines,
@@ -43,12 +44,23 @@ export function SearchResults() {
   const returnDate = searchParams.get("returnDate") ?? undefined;
   const adults = Number(searchParams.get("adults") ?? "1");
   const children = Number(searchParams.get("children") ?? "0");
+  const cabinClass = (searchParams.get("cabinClass") as CabinClass | null) ?? undefined;
+  const budgetParam = searchParams.get("budget");
+  const budget = budgetParam ? Number(budgetParam) : undefined;
 
   const isAnywhere = destination === "ANYWHERE";
   const missingParams = !origin || !destination || !departureDate;
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [sortBy, setSortBy] = useState<SortOption>("cheapest");
-  const [filters, setFilters] = useState<FlightFilters>({});
+  const [filters, setFilters] = useState<FlightFilters>(budget ? { maxPrice: budget } : {});
+  const [bookingMode, setBookingMode] = useState<BookingMode>("unavailable");
+
+  useEffect(() => {
+    fetch("/api/booking/status")
+      .then((res) => res.json())
+      .then((data) => setBookingMode(data.mode ?? "unavailable"))
+      .catch(() => setBookingMode("unavailable"));
+  }, []);
 
   useEffect(() => {
     if (missingParams) return;
@@ -59,12 +71,12 @@ export function SearchResults() {
     // change effect, not derived render state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: "loading" });
-    setFilters({});
+    setFilters(budget ? { maxPrice: budget } : {});
 
     const endpoint = isAnywhere ? "/api/flights/anywhere" : "/api/flights/search";
     const body = isAnywhere
-      ? { origin, departureDate, returnDate, adults, children }
-      : { origin, destination, departureDate, returnDate, adults, children };
+      ? { origin, departureDate, returnDate, adults, children, maximumPrice: budget }
+      : { origin, destination, departureDate, returnDate, adults, children, cabinClass };
 
     fetch(endpoint, {
       method: "POST",
@@ -89,7 +101,18 @@ export function SearchResults() {
       });
 
     return () => controller.abort();
-  }, [origin, destination, departureDate, returnDate, adults, children, isAnywhere, missingParams]);
+  }, [
+    origin,
+    destination,
+    departureDate,
+    returnDate,
+    adults,
+    children,
+    cabinClass,
+    budget,
+    isAnywhere,
+    missingParams,
+  ]);
 
   const flights = useMemo(
     () => (state.status === "ready-flights" ? state.data.results : []),
@@ -205,6 +228,7 @@ export function SearchResults() {
                   <FlightCard
                     key={flight.id}
                     flight={flight}
+                    bookingMode={bookingMode}
                     onSelect={(f: FlightResult) =>
                       track({ name: "deal_click", origin, destination, price: f.price })
                     }

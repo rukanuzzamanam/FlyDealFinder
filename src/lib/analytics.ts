@@ -14,7 +14,9 @@ export type AnalyticsEvent =
   | { name: "anywhere_search"; origin: string; destinationCount: number }
   | { name: "flight_result_view"; origin: string; destination: string; price: number }
   | { name: "deal_click"; origin: string; destination: string; price: number }
-  | { name: "price_alert_created"; origin: string; destination: string; targetPrice: number };
+  | { name: "price_alert_created"; origin: string; destination: string; targetPrice: number }
+  | { name: "newsletter_signup"; preferenceCount: number }
+  | { name: "booking_session_created"; origin: string; destination: string; mode: string };
 
 export function track(event: AnalyticsEvent): void {
   if (process.env.NODE_ENV !== "production") {

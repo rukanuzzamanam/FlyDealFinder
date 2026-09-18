@@ -95,3 +95,47 @@ export const priceAlertSchema = z.object({
 });
 
 export type PriceAlertInput = z.infer<typeof priceAlertSchema>;
+
+export const NEWSLETTER_PREFERENCES = [
+  "Australia",
+  "Asia",
+  "Europe",
+  "USA",
+  "Business Class",
+  "Family Travel",
+] as const;
+
+export const newsletterSignupSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  preferences: z.array(z.enum(NEWSLETTER_PREFERENCES)).default([]),
+});
+
+export type NewsletterSignupInput = z.infer<typeof newsletterSignupSchema>;
+
+export const contactSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  message: z.string().trim().min(10, "Message must be at least 10 characters").max(5000),
+  // Honeypot field — real users never fill this in; bots that autofill every
+  // field will, so a non-empty value is treated as spam (see /api/contact).
+  companyWebsite: z.string().max(0, "Spam detected").optional().or(z.literal("")),
+});
+
+export type ContactInput = z.infer<typeof contactSchema>;
+
+export const bookingSessionSchema = z.object({
+  origin: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(IATA_OR_CITY_CODE, "Origin must be a 3-letter airport/city code"),
+  destination: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(IATA_OR_CITY_CODE, "Destination must be a 3-letter airport/city code"),
+  departureDate: dateField,
+  returnDate: dateField.optional(),
+});
+
+export type BookingSessionInput = z.infer<typeof bookingSessionSchema>;

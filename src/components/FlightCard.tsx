@@ -1,11 +1,15 @@
+import { BookingButton } from "@/components/BookingButton";
 import { formatDate, formatPrice, formatTime, stopsLabel } from "@/lib/format";
+import type { BookingMode } from "@/lib/booking-providers";
 import type { FlightResult } from "@/lib/types";
 
 export function FlightCard({
   flight,
+  bookingMode,
   onSelect,
 }: {
   flight: FlightResult;
+  bookingMode: BookingMode;
   onSelect?: (flight: FlightResult) => void;
 }) {
   return (
@@ -63,21 +67,15 @@ export function FlightCard({
           <p className="text-xl font-bold text-slate-900 sm:text-2xl dark:text-white">
             {formatPrice(flight.price, flight.currency)}
           </p>
-          {flight.bookingUrl ? (
-            <a
-              href={flight.bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => onSelect?.(flight)}
-              className="min-h-11 rounded-lg bg-brand px-5 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-brand-dark"
-            >
-              View Deal
-            </a>
-          ) : (
-            <span className="min-h-11 rounded-lg bg-slate-100 px-5 py-2.5 text-center text-sm font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              Booking coming soon
-            </span>
-          )}
+          <span onClick={() => onSelect?.(flight)}>
+            <BookingButton
+              mode={bookingMode}
+              origin={flight.origin}
+              destination={flight.destination}
+              departureDate={flight.departureTime.slice(0, 10)}
+              returnDate={flight.returnDepartureTime?.slice(0, 10)}
+            />
+          </span>
         </div>
       </div>
     </article>

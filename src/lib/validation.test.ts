@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { anywhereSearchSchema, flightSearchSchema, priceAlertSchema } from "./validation";
+import {
+  anywhereSearchSchema,
+  bookingSessionSchema,
+  contactSchema,
+  flightSearchSchema,
+  newsletterSignupSchema,
+  priceAlertSchema,
+} from "./validation";
 
 function daysFromNow(days: number): string {
   const d = new Date();
@@ -139,6 +146,80 @@ describe("priceAlertSchema", () => {
       origin: "SYD",
       destination: "NRT",
       targetPrice: -10,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("newsletterSignupSchema", () => {
+  it("accepts an email with no preferences", () => {
+    const result = newsletterSignupSchema.safeParse({ email: "Traveller@Example.com" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.email).toBe("traveller@example.com");
+      expect(result.data.preferences).toEqual([]);
+    }
+  });
+
+  it("accepts a known preference", () => {
+    const result = newsletterSignupSchema.safeParse({
+      email: "traveller@example.com",
+      preferences: ["Asia", "Business Class"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unknown preference", () => {
+    const result = newsletterSignupSchema.safeParse({
+      email: "traveller@example.com",
+      preferences: ["Antarctica"],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("contactSchema", () => {
+  const validContact = {
+    name: "Alex Traveller",
+    email: "alex@example.com",
+    message: "Hi, I have a question about a booking.",
+  };
+
+  it("accepts a valid message with an empty honeypot", () => {
+    expect(contactSchema.safeParse({ ...validContact, companyWebsite: "" }).success).toBe(true);
+    expect(contactSchema.safeParse(validContact).success).toBe(true);
+  });
+
+  it("rejects a message that's too short", () => {
+    const result = contactSchema.safeParse({ ...validContact, message: "hi" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a filled-in honeypot field", () => {
+    const result = contactSchema.safeParse({ ...validContact, companyWebsite: "http://spam.example" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("bookingSessionSchema", () => {
+  it("accepts a valid one-way booking request", () => {
+    const result = bookingSessionSchema.safeParse({
+      origin: "syd",
+      destination: "dps",
+      departureDate: daysFromNow(30),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.origin).toBe("SYD");
+      expect(result.data.destination).toBe("DPS");
+    }
+  });
+
+  it("rejects an invalid airport code", () => {
+    const result = bookingSessionSchema.safeParse({
+      origin: "SYDNEY",
+      destination: "DPS",
+      departureDate: daysFromNow(30),
     });
     expect(result.success).toBe(false);
   });

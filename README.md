@@ -32,6 +32,14 @@ destination, and get back real, live fares sourced from the
   price, stops, airline, and time-of-day filters.
 - **Price alerts** — save a target price to a Postgres table (email
   notifications are not implemented yet — see [Known limitations](#known-limitations)).
+- **Deals & Explore** (`/deals`, `/explore`) — live cheapest fares across the
+  full destination list, filterable by region/price/direct-only.
+- **Booking** — via Duffel Links (`src/lib/booking-providers/`), gated
+  behind commercial configuration — see [`docs/revenue.md`](docs/revenue.md).
+- **SEO landing pages** — a small, hand-authored set (`/cheap-flights-from-sydney`
+  and three route pages) with structured data — see [`docs/seo.md`](docs/seo.md).
+- **Legal/trust pages** — `/about`, `/contact`, `/privacy`, `/terms`,
+  `/cookies`, `/disclaimer`, `/affiliate-disclosure`.
 - **Admin foundation** — a Basic-Auth-protected `/admin` page listing
   configured destinations and integration status.
 
@@ -89,6 +97,10 @@ Set these in `.env.local` (never committed — see `.gitignore`).
 | `SUPABASE_URL` | Optional | Supabase project URL. Without it, destination management falls back to the static list in `src/lib/destinations.ts`, and price alerts return a 503. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | **Server-only** service role key (bypasses RLS). Never exposed to the client — see `src/lib/db/supabase.ts`. |
 | `ADMIN_PASSWORD` | Optional | Basic-Auth password for `/admin`. If unset, `/admin` returns 503 (fails closed, not open). |
+| `DUFFEL_LINKS_ENABLED` | Optional | Set to `true` to activate booking via Duffel Links. Requires a Duffel account approved for Duffel Payments — see [`docs/revenue.md`](docs/revenue.md). Without it, "View Deal" always shows "Booking coming soon". |
+| `DUFFEL_LINKS_MODE` | Optional | `test` (default) or `live` — shown verbatim to users as a "Test Booking" badge or a real booking link. Never inferred automatically; set to `live` only once real payments are confirmed working. |
+| `BOOKING_MARKUP_RATE` | Optional | Decimal markup rate applied to Duffel Links bookings, e.g. `0.05` for 5%. |
+| `CONTACT_EMAIL` | Optional | Shown on `/contact` as an alternative way to reach you. Contact form submissions are stored in Supabase, not emailed — no email provider is configured yet. |
 
 `DUFFEL_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` are read only in
 server-side code (API routes, `src/lib/db/*`, `src/lib/flight-providers/*`)
@@ -107,10 +119,11 @@ which Duffel endpoints and fields this app uses, and what to check first if
 something in the Duffel integration needs updating.
 
 **Note on booking:** Duffel does not provide a booking deep-link/affiliate
-URL on an offer — completing a purchase requires creating an Order via the
-API with payment details. This MVP does not implement order creation (see
-[Known limitations](#known-limitations)), so `bookingUrl` is `null` for
-every result today.
+URL directly on a search offer. Booking is implemented via **Duffel Links**
+(`src/lib/booking-providers/`), a Duffel-hosted checkout — but it stays
+inactive ("Booking coming soon") until `DUFFEL_LINKS_ENABLED` is explicitly
+set, since it requires a separately-approved Duffel Payments account. See
+[`docs/revenue.md`](docs/revenue.md) for the full picture.
 
 ## Database setup
 
@@ -222,10 +235,11 @@ Nothing outside `src/lib/flight-providers/` needs to change: API routes,
 
 ## Known limitations
 
-- **No booking flow.** Duffel has no deep-link/affiliate URL; completing a
-  purchase requires creating an Order via the API. This MVP surfaces
-  search results only — `bookingUrl` is always `null`. See
-  `docs/duffel-integration.md`.
+- **Booking is gated behind commercial configuration.** The Duffel Links
+  integration (`src/lib/booking-providers/`) is implemented, but requires an
+  approved Duffel Payments account before `DUFFEL_LINKS_ENABLED` can safely
+  be turned on — see `docs/revenue.md`. Until then, every "View Deal" shows
+  "Booking coming soon", never a fake link.
 - **No price alert notifications.** Alerts are stored in `price_alerts`
   but nothing checks fares against them yet — no scheduled job/worker is
   implemented (per the brief, this was intentionally deferred; the schema
