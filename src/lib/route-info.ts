@@ -8,15 +8,16 @@ export interface RouteSample {
   cheapest: FlightResult | null;
   directAvailable: boolean;
   airlines: string[];
+  /** When this sample was actually fetched — shown as "Checked X ago" so a
+   * cached (up to 30 min old) sample is never implied to be live. */
+  checkedAt: string;
 }
-
-const EMPTY_SAMPLE: RouteSample = { cheapest: null, directAvailable: false, airlines: [] };
 
 /**
  * Backs the SEO route landing pages (`/sydney-to-bali-flights` etc.) — a
- * single live/cached search used to derive real "typical duration",
- * "direct available", and "airlines serving this route" facts, so those
- * pages never state invented information (brief section 16).
+ * single recently-checked (cached up to 30 min) search used to derive real
+ * "typical duration", "direct available", and "airlines serving this route"
+ * facts, so those pages never state invented information (brief section 16).
  */
 export async function getRouteSample(
   origin: string,
@@ -34,7 +35,12 @@ export async function getRouteSample(
   const cached = flightSearchCache.get(cacheKey) as RouteSample | undefined;
   if (cached) return cached;
 
-  let sample = EMPTY_SAMPLE;
+  let sample: RouteSample = {
+    cheapest: null,
+    directAvailable: false,
+    airlines: [],
+    checkedAt: new Date().toISOString(),
+  };
   try {
     const provider = getFlightProvider();
     const result = await provider.searchFlights({
@@ -51,6 +57,7 @@ export async function getRouteSample(
         cheapest,
         directAvailable: result.results.some((r) => r.stops === 0),
         airlines,
+        checkedAt: new Date().toISOString(),
       };
     }
   } catch {

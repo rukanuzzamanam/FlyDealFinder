@@ -9,6 +9,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 const baseParams = {
+  providerOfferId: "off_0000ABC123",
   origin: "SYD",
   destination: "DPS",
   departureDate: "2030-10-12",
@@ -40,10 +41,25 @@ describe("DuffelLinksBookingProvider", () => {
     expect(init.headers["Duffel-Version"]).toBe("v2");
 
     const body = JSON.parse(init.body);
+    expect(body.data.reference).toBe("off_0000ABC123");
     expect(body.data.markup_rate).toBe("0.05");
     expect(body.data.success_url).toBe("https://flydealfinder.example/booking/success");
     expect(body.data.failure_url).toBe("https://flydealfinder.example/booking/failed");
     expect(body.data.flights).toEqual({ enabled: true });
+  });
+
+  it("uses the provider offer id as the session reference, not the route/date", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(201, { data: { url: "https://pay.duffel.com/links/abc123" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = new DuffelLinksBookingProvider("test-token", "test", "https://flydealfinder.example");
+    await provider.createBookingSession({ ...baseParams, providerOfferId: "off_specific_offer" });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.data.reference).toBe("off_specific_offer");
   });
 
   it("reports live mode when configured for live", async () => {

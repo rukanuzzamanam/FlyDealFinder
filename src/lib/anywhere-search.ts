@@ -1,8 +1,15 @@
+import { buildSearchCacheKey } from "./cache";
 import { mapWithConcurrency, withTimeout } from "./concurrency";
 import { ANYWHERE_SEARCH_BATCH_LIMIT, ANYWHERE_SEARCH_CONCURRENCY } from "./destinations";
 import { getActiveDestinations } from "./db/destinations";
 import type { FlightProvider, FlightProviderError } from "./flight-providers";
-import type { AnywhereSearchResult, Destination, DestinationDeal, PassengerCounts } from "./types";
+import type {
+  AnywhereSearchResult,
+  CabinClass,
+  Destination,
+  DestinationDeal,
+  PassengerCounts,
+} from "./types";
 
 const PER_DESTINATION_TIMEOUT_MS = 18_000;
 
@@ -12,6 +19,37 @@ export interface AnywhereSearchOptions {
   returnDate?: string;
   passengers: PassengerCounts;
   maximumPrice?: number;
+  cabinClass?: CabinClass;
+}
+
+/**
+ * Every parameter that changes what an Anywhere search returns must be part
+ * of its cache key — a search for a $300 budget and one for an $800 budget
+ * (or economy vs. business) are different requests and must never share a
+ * cached result. Exported so the API route and tests use the exact same key
+ * shape (see anywhere-search.test.ts).
+ */
+export interface AnywhereCacheKeyParams {
+  origin: string;
+  departureDate: string;
+  returnDate?: string;
+  adults: number;
+  children: number;
+  maximumPrice?: number;
+  cabinClass?: CabinClass;
+}
+
+export function buildAnywhereCacheKey(params: AnywhereCacheKeyParams): string {
+  return buildSearchCacheKey({
+    scope: "anywhere",
+    origin: params.origin,
+    departureDate: params.departureDate,
+    returnDate: params.returnDate,
+    adults: params.adults,
+    children: params.children,
+    maximumPrice: params.maximumPrice,
+    cabinClass: params.cabinClass,
+  });
 }
 
 /**
@@ -63,6 +101,7 @@ async function searchOneDestination(
         departureDate: options.departureDate,
         returnDate: options.returnDate,
         passengers: options.passengers,
+        cabinClass: options.cabinClass,
       }),
       PER_DESTINATION_TIMEOUT_MS,
       () => new Error(`Timed out searching ${destination.airportCode}`)

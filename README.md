@@ -5,8 +5,12 @@
 FlyDealFinder is a flight-deal discovery MVP built around one core question:
 *"I don't know where I want to go — show me the cheapest places I can fly."*
 Users pick a departure airport, optionally pick "Anywhere" as the
-destination, and get back real, live fares sourced from the
-[Duffel Flights API](https://duffel.com/docs/api).
+destination, and get back real fares sourced from the
+[Duffel Flights API](https://duffel.com/docs/api) — checked on search, and
+cached for a short time afterward (never invented, but not a guaranteed
+real-time feed on every page view — see [`docs/revenue.md`](docs/revenue.md)
+and [`docs/product-roadmap.md`](docs/product-roadmap.md) for what's real vs.
+planned).
 
 ## Table of contents
 
@@ -22,6 +26,7 @@ destination, and get back real, live fares sourced from the
 - [How to add destinations](#how-to-add-destinations)
 - [How to add another flight provider](#how-to-add-another-flight-provider)
 - [Known limitations](#known-limitations)
+- [Further documentation](#further-documentation)
 
 ## Project overview
 
@@ -248,9 +253,29 @@ Nothing outside `src/lib/flight-providers/` needs to change: API routes,
   (`src/lib/cache.ts`, `src/lib/rate-limit.ts`) — fine for a single-instance
   MVP deployment, not a substitute for Redis/Upstash + an edge rate limiter
   at real scale.
-- **No airport autocomplete.** "From"/"To" are `<select>` dropdowns backed
-  by a curated list (`src/lib/airports.ts`, `src/lib/destinations.ts`), not
-  a full airport database with search-as-you-type.
-- **English/AUD-centric formatting.** Currency/date formatting defaults to
-  `en-AU`; the price shown is whatever `total_currency` Duffel returns for
-  that offer (not converted).
+- **Airport autocomplete is search-as-you-type but not a full airport
+  database.** "From"/"To" (`src/components/AirportCombobox.tsx`) filter a
+  curated list (`src/lib/airports.ts`, `src/lib/destinations.ts`), not every
+  airport in the world.
+- **Currency is preserved, not converted.** Prices are always shown in
+  whatever `total_currency` Duffel returns for that offer (e.g. `AUD $289`,
+  `USD $190`), never silently assumed to be AUD or converted — see
+  `src/lib/format.ts`'s `formatPrice()`. No FX conversion is implemented.
+- **No real flexible-date × Anywhere combination yet.** `/flexible-dates`
+  checks a bounded spread of dates for one specific route; checking every
+  date across every Anywhere destination at once needs a background job to
+  stay within API-cost bounds — see `docs/product-roadmap.md`.
+
+## Further documentation
+
+- [`docs/architecture.md`](docs/architecture.md) — layers, caching, and key
+  design decisions.
+- [`docs/duffel-integration.md`](docs/duffel-integration.md) — exactly which
+  Duffel endpoints/fields this app uses.
+- [`docs/deployment.md`](docs/deployment.md) — deploying to Vercel.
+- [`docs/revenue.md`](docs/revenue.md) — the booking/monetization
+  architecture and what's required before it can go live.
+- [`docs/seo.md`](docs/seo.md) — which pages are indexed and why, and
+  structured data.
+- [`docs/product-roadmap.md`](docs/product-roadmap.md) — MVP/V2/V3 scope and
+  what's explicitly not built yet.

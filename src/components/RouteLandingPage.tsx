@@ -3,7 +3,8 @@ import { SearchForm } from "@/components/SearchForm";
 import { DEFAULT_DESTINATIONS } from "@/lib/destinations";
 import { jsonLdString } from "@/lib/json-ld";
 import { getRouteSample } from "@/lib/route-info";
-import { formatPrice, stopsLabel } from "@/lib/format";
+import { formatPrice, formatRelativeTime, stopsLabel } from "@/lib/format";
+import { defaultSearchWindow } from "@/lib/search-window";
 
 interface RouteLandingPageProps {
   origin: { code: string; city: string };
@@ -16,12 +17,6 @@ interface RouteLandingPageProps {
   canonicalPath: string;
 }
 
-function addDaysIso(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export async function RouteLandingPage({
@@ -32,8 +27,7 @@ export async function RouteLandingPage({
   relatedDestinationCodes,
   canonicalPath,
 }: RouteLandingPageProps) {
-  const departureDate = addDaysIso(30);
-  const returnDate = addDaysIso(37);
+  const { departureDate, returnDate } = defaultSearchWindow();
   const sample = await getRouteSample(origin.code, destination.code, departureDate, returnDate);
 
   const related = DEFAULT_DESTINATIONS.filter((d) => relatedDestinationCodes.includes(d.airportCode));
@@ -83,7 +77,7 @@ export async function RouteLandingPage({
         <SearchForm initialOrigin={origin.code} initialDestination={destination.code} />
       </div>
 
-      <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="mb-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <InfoCard
           label="Cheapest fare found"
           value={sample.cheapest ? formatPrice(sample.cheapest.price, sample.cheapest.currency) : "Search above"}
@@ -94,13 +88,20 @@ export async function RouteLandingPage({
         />
         <InfoCard
           label="Direct flights"
-          value={sample.cheapest ? stopsLabel(sample.cheapest.stops) : "Check live search"}
+          value={sample.cheapest ? stopsLabel(sample.cheapest.stops) : "Search above to check"}
         />
       </section>
 
+      {sample.cheapest && (
+        <p className="mb-6 text-xs text-slate-400 dark:text-slate-500">
+          Checked {formatRelativeTime(sample.checkedAt)} for a 7-night trip departing in about a
+          month. Prices and availability are confirmed during booking.
+        </p>
+      )}
+
       {sample.airlines.length > 0 && (
         <p className="mb-8 text-sm text-slate-600 dark:text-slate-300">
-          Airlines currently showing fares on this route: {sample.airlines.join(", ")}.
+          Airlines recently showing fares on this route: {sample.airlines.join(", ")}.
         </p>
       )}
 

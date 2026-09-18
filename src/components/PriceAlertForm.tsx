@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DEFAULT_DESTINATIONS } from "@/lib/destinations";
 import { DEFAULT_ORIGIN, POPULAR_ORIGINS } from "@/lib/airports";
 import { track } from "@/lib/analytics";
+import { formatPrice } from "@/lib/format";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -47,7 +48,8 @@ export function PriceAlertForm() {
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
         <p className="font-semibold">You&apos;re all set!</p>
         <p className="text-sm">
-          We&apos;ll email {email} when {origin} → {destination} drops to ${targetPrice} or less.
+          We&apos;ll email {email} when {origin} → {destination} drops to{" "}
+          {formatPrice(targetPrice, "AUD")} or less.
         </p>
       </div>
     );

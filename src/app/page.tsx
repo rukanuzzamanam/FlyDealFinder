@@ -7,11 +7,14 @@ import { PriceAlertForm } from "@/components/PriceAlertForm";
 import { SearchForm } from "@/components/SearchForm";
 import { DEFAULT_ORIGIN } from "@/lib/airports";
 import { DEFAULT_DESTINATIONS } from "@/lib/destinations";
+import { formatRelativeTime } from "@/lib/format";
 import { getHomepageDeals } from "@/lib/homepage-deals";
+import { defaultSearchWindow } from "@/lib/search-window";
 
-// Revalidate periodically (ISR) rather than fetching live fares on every
-// request or freezing them forever at build time — keeps the homepage fast
-// while still showing real, reasonably fresh prices.
+// Revalidate periodically (ISR) rather than checking fares on every request
+// or freezing them forever at build time — keeps the homepage fast while
+// still showing reasonably fresh (not "live") prices; see HomeDeals below
+// for the visible "Checked X ago" timestamp this implies.
 export const revalidate = 1800; // 30 minutes
 
 const POPULAR_ROUTES = [
@@ -24,8 +27,8 @@ const EXPLORE_DESTINATION_CODES = ["DPS", "BKK", "SIN", "NRT", "AKL", "DXB"];
 
 const WHY_FLYDEALFINDER = [
   {
-    title: "Live flight prices",
-    body: "Every fare comes straight from our flight search partner in real time — never invented or cached forever.",
+    title: "Recently checked prices",
+    body: "Every fare comes straight from our flight search partner, checked regularly and never invented — we'll always tell you how recently a price was checked.",
     emoji: "📡",
   },
   {
@@ -50,13 +53,9 @@ const WHY_FLYDEALFINDER = [
   },
 ];
 
-function addDaysIso(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function HomePage() {
+  const { departureDate: exploreDepartureDate, returnDate: exploreReturnDate } = defaultSearchWindow();
+
   return (
     <>
       <section className="bg-gradient-to-b from-sky-50 to-white px-4 pb-12 pt-14 sm:px-6 sm:pt-20 dark:from-slate-900 dark:to-slate-950">
@@ -81,7 +80,7 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-1 flex items-end justify-between">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
             🔥 Cheap Flights From Sydney
           </h2>
@@ -89,6 +88,10 @@ export default function HomePage() {
             See all deals →
           </Link>
         </div>
+        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+          Recently checked fares for a 7-night trip departing in about a month — not every date, and
+          not guaranteed live at this exact moment.
+        </p>
         <Suspense fallback={<DealsSkeleton />}>
           <HomeDeals />
         </Suspense>
@@ -98,16 +101,15 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl">
           <h2 className="mb-2 text-2xl font-bold text-slate-900 dark:text-white">Explore Anywhere</h2>
           <p className="mb-6 text-sm text-slate-600 dark:text-slate-300">
-            Don&apos;t know where you want to go? Pick a region and see what&apos;s cheap right now.
+            Don&apos;t know where you want to go? Pick a region and see what&apos;s recently been
+            cheap.
           </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {DEFAULT_DESTINATIONS.filter((d) => EXPLORE_DESTINATION_CODES.includes(d.airportCode)).map(
               (d) => (
                 <Link
                   key={d.id}
-                  href={`/search?origin=${DEFAULT_ORIGIN}&destination=${d.airportCode}&departureDate=${addDaysIso(
-                    30
-                  )}&returnDate=${addDaysIso(37)}&adults=1&children=0`}
+                  href={`/search?origin=${DEFAULT_ORIGIN}&destination=${d.airportCode}&departureDate=${exploreDepartureDate}&returnDate=${exploreReturnDate}&adults=1&children=0`}
                   className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover dark:border-slate-800 dark:bg-slate-900"
                 >
                   <span className="text-3xl" aria-hidden="true">
@@ -154,11 +156,11 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-center">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Flexible Travel</h2>
           <p className="max-w-xl text-sm text-slate-600 dark:text-slate-300">
-            Not locked into exact dates? Search Anywhere for a whole month and we&apos;ll surface the
-            cheapest days to fly across dozens of destinations.
+            Not locked into exact dates? Pick a route and a month, and we&apos;ll check a spread of
+            dates to find the cheapest days to fly.
           </p>
           <Link
-            href="/search?origin=SYD&destination=ANYWHERE"
+            href="/flexible-dates"
             className="mt-2 inline-block rounded-xl bg-brand px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
           >
             Find the cheapest dates
@@ -208,32 +210,37 @@ export default function HomePage() {
 }
 
 async function HomeDeals() {
-  const departureDate = addDaysIso(30);
-  const returnDate = addDaysIso(37);
-  const deals = await getHomepageDeals(DEFAULT_ORIGIN, departureDate, returnDate);
+  const { departureDate, returnDate } = defaultSearchWindow();
+  const { deals, checkedAt } = await getHomepageDeals(DEFAULT_ORIGIN, departureDate, returnDate);
 
   if (deals.length === 0) {
     return (
       <EmptyState
-        title="Live deals aren't available right now"
-        message="We couldn't load live fares from Sydney at the moment. Try searching directly above, or check back shortly."
+        title="Recently checked deals aren't available right now"
+        message="We couldn't check fares from Sydney at the moment. Try searching directly above, or check back shortly."
       />
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {deals.map((deal) => (
-        <DestinationCard
-          key={deal.destination.id}
-          deal={deal}
-          origin={DEFAULT_ORIGIN}
-          departureDate={departureDate}
-          returnDate={returnDate}
-          adults={1}
-          childrenCount={0}
-        />
-      ))}
+    <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {deals.map((deal) => (
+          <DestinationCard
+            key={deal.destination.id}
+            deal={deal}
+            origin={DEFAULT_ORIGIN}
+            departureDate={departureDate}
+            returnDate={returnDate}
+            adults={1}
+            childrenCount={0}
+          />
+        ))}
+      </div>
+      <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+        Checked {formatRelativeTime(checkedAt)}. Prices and availability are confirmed during
+        booking.
+      </p>
     </div>
   );
 }

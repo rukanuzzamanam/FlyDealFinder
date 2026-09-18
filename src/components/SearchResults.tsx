@@ -75,7 +75,7 @@ export function SearchResults() {
 
     const endpoint = isAnywhere ? "/api/flights/anywhere" : "/api/flights/search";
     const body = isAnywhere
-      ? { origin, departureDate, returnDate, adults, children, maximumPrice: budget }
+      ? { origin, departureDate, returnDate, adults, children, maximumPrice: budget, cabinClass }
       : { origin, destination, departureDate, returnDate, adults, children, cabinClass };
 
     fetch(endpoint, {

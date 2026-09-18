@@ -6,7 +6,7 @@ export const revalidate = 1800;
 export const metadata: Metadata = {
   title: "Sydney to Bali Flights — Cheap SYD to DPS Fares",
   description:
-    "Compare cheap flights from Sydney (SYD) to Bali (DPS). Flight time, direct options, airlines, and live fares.",
+    "Compare cheap flights from Sydney (SYD) to Bali (DPS). Flight time, direct options, airlines, and recently checked fares.",
   alternates: { canonical: "/sydney-to-bali-flights" },
 };
 

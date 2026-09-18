@@ -3,10 +3,17 @@ import {
   anywhereSearchSchema,
   bookingSessionSchema,
   contactSchema,
+  flexibleDateSearchSchema,
   flightSearchSchema,
   newsletterSignupSchema,
   priceAlertSchema,
 } from "./validation";
+
+function monthsFromNow(months: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 7);
+}
 
 function daysFromNow(days: number): string {
   const d = new Date();
@@ -113,6 +120,20 @@ describe("anywhereSearchSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts an optional cabin class and a maximum price", () => {
+    const result = anywhereSearchSchema.safeParse({
+      origin: "SYD",
+      departureDate: daysFromNow(15),
+      cabinClass: "business",
+      maximumPrice: 800,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cabinClass).toBe("business");
+      expect(result.data.maximumPrice).toBe(800);
+    }
+  });
 });
 
 describe("priceAlertSchema", () => {
@@ -204,6 +225,7 @@ describe("contactSchema", () => {
 describe("bookingSessionSchema", () => {
   it("accepts a valid one-way booking request", () => {
     const result = bookingSessionSchema.safeParse({
+      providerOfferId: "off_0000ABC123",
       origin: "syd",
       destination: "dps",
       departureDate: daysFromNow(30),
@@ -212,14 +234,108 @@ describe("bookingSessionSchema", () => {
     if (result.success) {
       expect(result.data.origin).toBe("SYD");
       expect(result.data.destination).toBe("DPS");
+      expect(result.data.providerOfferId).toBe("off_0000ABC123");
     }
+  });
+
+  it("rejects a booking request with no provider offer id", () => {
+    const result = bookingSessionSchema.safeParse({
+      origin: "SYD",
+      destination: "DPS",
+      departureDate: daysFromNow(30),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty provider offer id", () => {
+    const result = bookingSessionSchema.safeParse({
+      providerOfferId: "",
+      origin: "SYD",
+      destination: "DPS",
+      departureDate: daysFromNow(30),
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects an invalid airport code", () => {
     const result = bookingSessionSchema.safeParse({
+      providerOfferId: "off_0000ABC123",
       origin: "SYDNEY",
       destination: "DPS",
       departureDate: daysFromNow(30),
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("flexibleDateSearchSchema", () => {
+  it("accepts a valid flexible-date search", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "syd",
+      destination: "dps",
+      month: monthsFromNow(1),
+      tripDurationDays: 10,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.origin).toBe("SYD");
+      expect(result.data.destination).toBe("DPS");
+      expect(result.data.tripDurationDays).toBe(10);
+    }
+  });
+
+  it("defaults trip duration to 7 days", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "SYD",
+      destination: "DPS",
+      month: monthsFromNow(1),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.tripDurationDays).toBe(7);
+  });
+
+  it("rejects ANYWHERE as a destination (single route only for this iteration)", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "SYD",
+      destination: "ANYWHERE",
+      month: monthsFromNow(1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects origin equal to destination", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "SYD",
+      destination: "SYD",
+      month: monthsFromNow(1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a malformed month", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "SYD",
+      destination: "DPS",
+      month: "2030-11-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a month in the past", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "SYD",
+      destination: "DPS",
+      month: "2019-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a trip duration over 30 days", () => {
+    const result = flexibleDateSearchSchema.safeParse({
+      origin: "SYD",
+      destination: "DPS",
+      month: monthsFromNow(1),
+      tripDurationDays: 45,
     });
     expect(result.success).toBe(false);
   });

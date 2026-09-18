@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeCompare } from "@/lib/safe-compare";
 
 /**
  * Protects /admin with HTTP Basic Auth. This is a minimal MVP guard — swap
@@ -16,7 +17,7 @@ export function proxy(request: NextRequest) {
   if (authHeader?.startsWith("Basic ")) {
     const decoded = atob(authHeader.slice("Basic ".length));
     const [, password] = decoded.split(":");
-    if (password === adminPassword) {
+    if (password && safeCompare(password, adminPassword)) {
       return NextResponse.next();
     }
   }

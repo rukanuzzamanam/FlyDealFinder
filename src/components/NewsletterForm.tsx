@@ -53,7 +53,7 @@ export function NewsletterForm({ variant = "full" }: NewsletterFormProps) {
   if (status === "success") {
     return (
       <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-        You&apos;re subscribed! Check your inbox for a confirmation.
+        You&apos;re subscribed! We&apos;ll send you cheap-flight deals when they&apos;re available.
       </p>
     );
   }

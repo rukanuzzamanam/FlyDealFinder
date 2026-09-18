@@ -6,7 +6,7 @@ export const revalidate = 1800;
 export const metadata: Metadata = {
   title: "Sydney to Tokyo Flights — Cheap SYD to NRT Fares",
   description:
-    "Compare cheap flights from Sydney (SYD) to Tokyo (NRT). Flight time, direct options, airlines, and live fares.",
+    "Compare cheap flights from Sydney (SYD) to Tokyo (NRT). Flight time, direct options, airlines, and recently checked fares.",
   alternates: { canonical: "/sydney-to-tokyo-flights" },
 };
 

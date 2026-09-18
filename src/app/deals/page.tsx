@@ -3,33 +3,28 @@ import { Suspense } from "react";
 import { DestinationExplorer } from "@/components/DestinationExplorer";
 import { DEFAULT_ORIGIN } from "@/lib/airports";
 import { getDeals } from "@/lib/deals";
+import { defaultSearchWindow } from "@/lib/search-window";
 
 export const revalidate = 900; // 15 minutes
 
 export const metadata: Metadata = {
-  title: "Today's Flight Deals",
+  title: "Cheap Flight Deals",
   description:
-    "Browse today's cheapest flight deals from Sydney across dozens of destinations, filterable by region, price and direct flights.",
+    "Browse recently checked flight deals from Sydney for a 7-night trip across dozens of destinations, filterable by region, price and direct flights.",
 };
 
-function addDaysIso(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function DealsPage() {
-  const departureDate = addDaysIso(30);
-  const returnDate = addDaysIso(37);
+  const { departureDate, returnDate } = defaultSearchWindow();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="mb-1 text-3xl font-bold text-slate-900 dark:text-white">
-        🔥 Today&apos;s Flight Deals
+        🔥 Cheap Flight Deals
       </h1>
       <p className="mb-6 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-        Live cheapest fares across our destination list, refreshed regularly. Prices shown are the
-        lowest fare found for each route — check availability may change before booking.
+        Recently checked fares across our destination list, for a 7-night trip departing in about a
+        month — not every possible date. Prices shown are the lowest fare found for each route;
+        availability may change before booking.
       </p>
       <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />}>
         <DealsContent departureDate={departureDate} returnDate={returnDate} />

@@ -70,10 +70,12 @@ export function FlightCard({
           <span onClick={() => onSelect?.(flight)}>
             <BookingButton
               mode={bookingMode}
+              providerOfferId={flight.providerOfferId}
               origin={flight.origin}
               destination={flight.destination}
               departureDate={flight.departureTime.slice(0, 10)}
               returnDate={flight.returnDepartureTime?.slice(0, 10)}
+              expiresAt={flight.expiresAt}
             />
           </span>
         </div>

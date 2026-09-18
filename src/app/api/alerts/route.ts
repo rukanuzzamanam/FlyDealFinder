@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createPriceAlert, DatabaseNotConfiguredError } from "@/lib/db/alerts";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request-body";
 import { priceAlertSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -16,14 +17,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  const body = await readJsonBody(request);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: 400 });
   }
 
-  const parsed = priceAlertSchema.safeParse(rawBody);
+  const parsed = priceAlertSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid price alert details", details: z.treeifyError(parsed.error) },

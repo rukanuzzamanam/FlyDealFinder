@@ -5,9 +5,10 @@ const LINK_COLUMNS: Array<{ title: string; links: Array<{ href: string; label: s
   {
     title: "Explore",
     links: [
-      { href: "/deals", label: "Today's Deals" },
+      { href: "/deals", label: "Cheap Flight Deals" },
       { href: "/explore", label: "Explore Destinations" },
       { href: "/search", label: "Search Flights" },
+      { href: "/flexible-dates", label: "Flexible Dates" },
       { href: "/cheap-flights-from-sydney", label: "Cheap Flights from Sydney" },
     ],
   },

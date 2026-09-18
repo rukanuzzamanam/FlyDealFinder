@@ -70,6 +70,7 @@ describe("DuffelFlightProvider", () => {
     expect(result.isEmpty).toBe(false);
     expect(result.results).toHaveLength(1);
     const flight = result.results[0];
+    expect(flight.providerOfferId).toBe("off_1");
     expect(flight.airline).toBe("Jetstar");
     expect(flight.origin).toBe("SYD");
     expect(flight.destination).toBe("DPS");

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logSearch } from "@/lib/db/searches";
 import { getFlightProvider, FlightProviderError } from "@/lib/flight-providers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request-body";
 import { buildSearchCacheKey, CACHE_TTL_MS, flightSearchCache } from "@/lib/cache";
 import type { FlightSearchResult } from "@/lib/types";
 import { flightSearchSchema } from "@/lib/validation";
@@ -19,14 +20,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  const body = await readJsonBody(request);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: 400 });
   }
 
-  const parsed = flightSearchSchema.safeParse(rawBody);
+  const parsed = flightSearchSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid search parameters", details: z.treeifyError(parsed.error) },

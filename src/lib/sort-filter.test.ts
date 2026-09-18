@@ -5,6 +5,7 @@ import type { FlightResult } from "./types";
 function flight(overrides: Partial<FlightResult>): FlightResult {
   return {
     id: "id",
+    providerOfferId: "off_id",
     airline: "Jetstar",
     airlineCode: "JQ",
     origin: "SYD",

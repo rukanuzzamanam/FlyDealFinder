@@ -24,6 +24,17 @@ export interface FlightSearchParams {
 
 export interface FlightResult {
   id: string;
+  /**
+   * The flight provider's own offer identifier (e.g. Duffel's `offer.id`).
+   * Distinct from `id` on purpose: `id` is this app's key for the result
+   * (used for React keys, de-duping, etc.) and could in principle become a
+   * synthesized value later (e.g. when merging results from multiple
+   * providers); `providerOfferId` must always be the exact identifier the
+   * provider needs to look up *this specific* offer again. The booking flow
+   * must key off this field, never off route/date alone — see
+   * src/lib/booking-providers and docs/revenue.md.
+   */
+  providerOfferId: string;
   airline: string;
   airlineCode?: string;
   airlineLogoUrl?: string;

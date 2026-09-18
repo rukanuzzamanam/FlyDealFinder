@@ -68,6 +68,7 @@ export const anywhereSearchSchema = z
     adults: z.coerce.number().int().min(1).max(9).default(1),
     children: z.coerce.number().int().min(0).max(8).default(0),
     maximumPrice: z.coerce.number().positive().max(100000).optional(),
+    cabinClass: z.enum(["economy", "premium_economy", "business", "first"]).optional(),
   })
   .refine(
     (v) => !v.returnDate || v.returnDate >= v.departureDate,
@@ -124,6 +125,14 @@ export const contactSchema = z.object({
 export type ContactInput = z.infer<typeof contactSchema>;
 
 export const bookingSessionSchema = z.object({
+  // Identifies the exact provider offer the user selected — a booking
+  // session must never be created from route/date alone (see
+  // src/lib/booking-providers and docs/revenue.md).
+  providerOfferId: z
+    .string()
+    .trim()
+    .min(1, "providerOfferId is required")
+    .max(200),
   origin: z
     .string()
     .trim()
@@ -139,3 +148,41 @@ export const bookingSessionSchema = z.object({
 });
 
 export type BookingSessionInput = z.infer<typeof bookingSessionSchema>;
+
+const MONTH_FIELD = /^\d{4}-\d{2}$/;
+
+export const flexibleDateSearchSchema = z
+  .object({
+    origin: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(IATA_OR_CITY_CODE, "Origin must be a 3-letter airport/city code"),
+    // A specific airport only — searching every "Anywhere" destination across
+    // every candidate date at once is out of scope (see
+    // src/lib/flexible-date-search.ts and docs/product-roadmap.md).
+    destination: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(IATA_OR_CITY_CODE, "Destination must be a specific 3-letter airport code"),
+    // "YYYY-MM" — the month to search flexible dates within.
+    month: z
+      .string()
+      .trim()
+      .regex(MONTH_FIELD, "Month must be in YYYY-MM format"),
+    tripDurationDays: z.coerce.number().int().min(1).max(30).default(7),
+    adults: z.coerce.number().int().min(1).max(9).default(1),
+    children: z.coerce.number().int().min(0).max(8).default(0),
+    cabinClass: z.enum(["economy", "premium_economy", "business", "first"]).optional(),
+  })
+  .refine((v) => v.origin !== v.destination, {
+    message: "Origin and destination cannot be the same",
+    path: ["destination"],
+  })
+  .refine((v) => v.month >= todayUtcDateString().slice(0, 7), {
+    message: "Month cannot be in the past",
+    path: ["month"],
+  });
+
+export type FlexibleDateSearchInput = z.infer<typeof flexibleDateSearchSchema>;

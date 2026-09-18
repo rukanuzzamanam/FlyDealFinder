@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${siteUrl}/`, changeFrequency: "daily", priority: 1 },
     { url: `${siteUrl}/search`, changeFrequency: "daily", priority: 0.6 },
+    { url: `${siteUrl}/flexible-dates`, changeFrequency: "daily", priority: 0.6 },
     { url: `${siteUrl}/deals`, changeFrequency: "hourly", priority: 0.9 },
     { url: `${siteUrl}/explore`, changeFrequency: "daily", priority: 0.8 },
     { url: `${siteUrl}/cheap-flights-from-sydney`, changeFrequency: "daily", priority: 0.8 },

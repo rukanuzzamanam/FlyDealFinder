@@ -7,6 +7,7 @@ import { SearchForm } from "@/components/SearchForm";
 import { DEFAULT_ORIGIN } from "@/lib/airports";
 import { getDeals } from "@/lib/deals";
 import { jsonLdString } from "@/lib/json-ld";
+import { defaultSearchWindow } from "@/lib/search-window";
 
 export const revalidate = 1800;
 
@@ -16,7 +17,7 @@ const CANONICAL_PATH = "/cheap-flights-from-sydney";
 export const metadata: Metadata = {
   title: "Cheap Flights from Sydney (SYD)",
   description:
-    "Find the cheapest flights from Sydney to destinations across Asia, the Pacific, Europe and beyond, with live fares updated regularly.",
+    "Find cheap flights from Sydney to destinations across Asia, the Pacific, Europe and beyond, with fares checked regularly.",
   alternates: { canonical: CANONICAL_PATH },
 };
 
@@ -24,7 +25,7 @@ const FAQ = [
   {
     question: "What's the best way to find cheap flights from Sydney?",
     answer:
-      "Use our Anywhere search to compare live fares from Sydney to dozens of destinations at once, or set a price alert on a specific route to get notified when it drops.",
+      "Use our Anywhere search to compare recently checked fares from Sydney to dozens of destinations at once, or set a price alert on a specific route to get notified when it drops.",
   },
   {
     question: "Which airport do flights from Sydney depart from?",
@@ -36,12 +37,6 @@ const FAQ = [
       "It varies by route and season. Comparing flexible dates (see the search above) usually shows you the cheapest days to fly for your destination.",
   },
 ];
-
-function addDaysIso(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export default function Page() {
   const breadcrumbJsonLd = {
@@ -77,8 +72,8 @@ export default function Page() {
       </h1>
       <p className="mb-6 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
         Sydney Airport (SYD) connects to destinations across the Pacific, Asia, the Middle East,
-        Europe and the Americas. Below are today&apos;s cheapest live fares we found from Sydney —
-        or search your own dates above.
+        Europe and the Americas. Below are recently checked fares for a 7-night trip departing in
+        about a month — or search your own dates above.
       </p>
 
       <div className="mb-8">
@@ -86,7 +81,7 @@ export default function Page() {
       </div>
 
       <h2 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">
-        Cheapest destinations from Sydney right now
+        Recently cheapest destinations from Sydney
       </h2>
       <Suspense fallback={<DealsSkeleton />}>
         <SydneyDeals />
@@ -123,16 +118,15 @@ export default function Page() {
 }
 
 async function SydneyDeals() {
-  const departureDate = addDaysIso(30);
-  const returnDate = addDaysIso(37);
+  const { departureDate, returnDate } = defaultSearchWindow();
   const result = await getDeals(DEFAULT_ORIGIN, departureDate, returnDate);
   const topDeals = result.deals.filter((d) => d.cheapestPrice != null).slice(0, 9);
 
   if (topDeals.length === 0) {
     return (
       <EmptyState
-        title="Live deals aren't available right now"
-        message="We couldn't load live fares from Sydney at the moment. Try searching directly above."
+        title="Recently checked deals aren't available right now"
+        message="We couldn't check fares from Sydney at the moment. Try searching directly above."
       />
     );
   }
@@ -144,8 +138,8 @@ async function SydneyDeals() {
           key={deal.destination.id}
           deal={deal}
           origin={DEFAULT_ORIGIN}
-          departureDate={addDaysIso(30)}
-          returnDate={addDaysIso(37)}
+          departureDate={departureDate}
+          returnDate={returnDate}
           adults={1}
           childrenCount={0}
         />

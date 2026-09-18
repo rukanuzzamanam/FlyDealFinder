@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { searchAnywhere } from "./anywhere-search";
+import { buildAnywhereCacheKey, searchAnywhere } from "./anywhere-search";
 import type { FlightProvider } from "./flight-providers/types";
 import type { FlightResult, FlightSearchParams, FlightSearchResult } from "./types";
 
 function makeResult(price: number, destination: string): FlightSearchResult {
   const flight: FlightResult = {
     id: `${destination}-${price}`,
+    providerOfferId: `off_${destination}-${price}`,
     airline: "Test Air",
     origin: "SYD",
     destination,
@@ -119,5 +120,62 @@ describe("searchAnywhere", () => {
     });
 
     expect(maxInFlight).toBeLessThanOrEqual(4);
+  });
+
+  it("passes cabin class through to the provider for every destination", async () => {
+    const provider = new FakeProvider();
+    await searchAnywhere(provider, {
+      origin: "SYD",
+      departureDate: "2030-11-01",
+      passengers: { adults: 1, children: 0 },
+      cabinClass: "business",
+    });
+
+    expect(provider.calls.length).toBeGreaterThan(0);
+    expect(provider.calls.every((c) => c.cabinClass === "business")).toBe(true);
+  });
+});
+
+describe("buildAnywhereCacheKey", () => {
+  const base = {
+    origin: "SYD",
+    departureDate: "2030-11-01",
+    returnDate: "2030-11-08",
+    adults: 1,
+    children: 0,
+  };
+
+  it("produces different cache keys for different budgets", () => {
+    // Regression test: Sydney -> Anywhere with a $300 budget must never
+    // return a cached result computed for an $800 budget, or vice versa.
+    const cheapBudget = buildAnywhereCacheKey({ ...base, maximumPrice: 300 });
+    const generousBudget = buildAnywhereCacheKey({ ...base, maximumPrice: 800 });
+    expect(cheapBudget).not.toBe(generousBudget);
+  });
+
+  it("produces different cache keys for different cabin classes", () => {
+    const economy = buildAnywhereCacheKey({ ...base, cabinClass: "economy" });
+    const business = buildAnywhereCacheKey({ ...base, cabinClass: "business" });
+    expect(economy).not.toBe(business);
+  });
+
+  it("produces different cache keys for a budget vs. no budget at all", () => {
+    const noBudget = buildAnywhereCacheKey({ ...base });
+    const withBudget = buildAnywhereCacheKey({ ...base, maximumPrice: 500 });
+    expect(noBudget).not.toBe(withBudget);
+  });
+
+  it("produces the same cache key for identical inputs", () => {
+    const a = buildAnywhereCacheKey({ ...base, maximumPrice: 500, cabinClass: "premium_economy" });
+    const b = buildAnywhereCacheKey({ ...base, maximumPrice: 500, cabinClass: "premium_economy" });
+    expect(a).toBe(b);
+  });
+
+  it("still distinguishes on origin/dates/passengers as before", () => {
+    const a = buildAnywhereCacheKey(base);
+    const differentOrigin = buildAnywhereCacheKey({ ...base, origin: "MEL" });
+    const differentAdults = buildAnywhereCacheKey({ ...base, adults: 2 });
+    expect(a).not.toBe(differentOrigin);
+    expect(a).not.toBe(differentAdults);
   });
 });

@@ -21,6 +21,18 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * provider therefore stays `unavailable` unless `DUFFEL_LINKS_ENABLED` is
  * explicitly set, and reports `DUFFEL_LINKS_MODE` (default "test") verbatim
  * rather than guessing live/test from the API token — see docs/revenue.md.
+ *
+ * IMPORTANT LIMITATION: Duffel Links' documented session-creation API
+ * (`POST /links/sessions`) has no parameter to preselect a specific offer —
+ * it hands the user a fresh Duffel-hosted search, not a deep link to the
+ * exact fare they clicked on FlyDealFinder. `params.providerOfferId` is
+ * therefore NOT sent as a "book this exact offer" instruction (Duffel Links
+ * has no such instruction to receive); it's used only as the session
+ * `reference` so a completed booking can be correlated back to the search
+ * result that prompted it (Duffel echoes `reference` back on the
+ * `success_url` redirect). The UI (`BookingButton`) must make this
+ * limitation explicit to the user rather than implying the exact displayed
+ * price/flight is guaranteed at checkout.
  */
 export class DuffelLinksBookingProvider implements BookingProvider {
   readonly name = "duffel_links";
@@ -35,7 +47,10 @@ export class DuffelLinksBookingProvider implements BookingProvider {
   async createBookingSession(params: BookingSessionParams): Promise<BookingSession> {
     const body = {
       data: {
-        reference: `${params.origin}-${params.destination}-${Date.now()}`,
+        // The provider offer id, not a route/date string — see the
+        // IMPORTANT LIMITATION note above for why this can't preselect the
+        // offer, only correlate a completed booking back to it.
+        reference: params.providerOfferId.slice(0, 64),
         success_url: `${this.siteUrl}/booking/success`,
         failure_url: `${this.siteUrl}/booking/failed`,
         abandonment_url: `${this.siteUrl}/search`,

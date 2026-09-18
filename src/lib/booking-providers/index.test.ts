@@ -41,6 +41,7 @@ describe("getBookingProvider", () => {
     const { getBookingProvider } = await import("./index");
 
     const session = await getBookingProvider().createBookingSession({
+      providerOfferId: "off_test",
       origin: "SYD",
       destination: "DPS",
       departureDate: "2030-01-01",

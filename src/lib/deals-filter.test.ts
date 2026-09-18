@@ -54,6 +54,7 @@ describe("filterDeals", () => {
 function baseFlight() {
   return {
     id: "f1",
+    providerOfferId: "off_f1",
     airline: "Test Air",
     origin: "SYD",
     destination: "TST",

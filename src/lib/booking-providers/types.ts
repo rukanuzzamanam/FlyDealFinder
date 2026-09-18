@@ -10,6 +10,9 @@
 export type BookingMode = "live" | "test" | "unavailable";
 
 export interface BookingSessionParams {
+  /** The provider's own offer identifier (`FlightResult.providerOfferId`) —
+   * identifies exactly which search result the user selected. */
+  providerOfferId: string;
   origin: string;
   destination: string;
   departureDate: string;

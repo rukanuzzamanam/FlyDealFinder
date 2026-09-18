@@ -22,15 +22,25 @@ export function formatIsoDuration(iso: string | undefined | null): string {
   return formatMinutes(parseIsoDurationToMinutes(iso));
 }
 
+/**
+ * Formats a price with an explicit currency code prefix — "AUD $289",
+ * "USD $190", "GBP £150" — never just "$289" on its own, since a bare `$`
+ * would wrongly imply every price is in the viewer's home currency. Prices
+ * are always shown in the provider's original currency; no FX conversion is
+ * implemented (see docs/product-roadmap.md).
+ */
 export function formatPrice(amount: number, currency: string): string {
+  const code = currency.toUpperCase();
   try {
-    return new Intl.NumberFormat("en-AU", {
+    const symbolAndAmount = new Intl.NumberFormat("en-AU", {
       style: "currency",
-      currency,
+      currency: code,
+      currencyDisplay: "narrowSymbol",
       maximumFractionDigits: 0,
     }).format(amount);
+    return `${code} ${symbolAndAmount}`;
   } catch {
-    return `${currency} $${Math.round(amount)}`;
+    return `${code} ${Math.round(amount)}`;
   }
 }
 
@@ -80,6 +90,45 @@ export function formatDate(iso: string | undefined): string {
     month: "short",
     timeZone: "UTC",
   }).format(date);
+}
+
+/** Formats a plain "YYYY-MM-DD" calendar date (no time component) as e.g.
+ * "12 Oct" — used for flexible-date search results, which are calendar
+ * dates rather than provider timestamps. */
+export function formatCalendarDate(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) return "—";
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+/**
+ * "Checked 8 minutes ago" style relative time, for showing how fresh a
+ * (possibly cached) fare actually is — never imply a cached price is live.
+ */
+export function formatRelativeTime(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "recently";
+
+  const diffMs = now.getTime() - then;
+  const diffMinutes = Math.round(diffMs / 60_000);
+
+  if (diffMinutes <= 0) return "just now";
+  if (diffMinutes === 1) return "1 minute ago";
+  if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours === 1) return "1 hour ago";
+  if (diffHours < 24) return `${diffHours} hours ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays === 1) return "1 day ago";
+  return `${diffDays} days ago`;
 }
 
 export function stopsLabel(stops: number): string {

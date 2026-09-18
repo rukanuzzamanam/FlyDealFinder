@@ -146,6 +146,11 @@ function normalizeOffer(offer: DuffelOffer): FlightResult | null {
 
   return {
     id: offer.id,
+    // Same value as `id` today (Duffel offers have no separate "search
+    // result" vs "offer" id), but kept as its own field so the booking flow
+    // never has to assume `id` means "the provider's offer identifier" —
+    // see the field's doc comment in src/lib/types.ts.
+    providerOfferId: offer.id,
     airline: offer.owner.name ?? "Unknown airline",
     airlineCode: offer.owner.iata_code ?? undefined,
     airlineLogoUrl: offer.owner.logo_symbol_url ?? undefined,

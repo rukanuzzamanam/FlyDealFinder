@@ -1,21 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { buildAnywhereCacheKey, searchAnywhere } from "@/lib/anywhere-search";
+import {
+  buildFlexibleDateCacheKey,
+  searchFlexibleDates,
+  type FlexibleDateSearchResult,
+} from "@/lib/flexible-date-search";
 import { CACHE_TTL_MS, flightSearchCache } from "@/lib/cache";
 import { getFlightProvider, FlightProviderError } from "@/lib/flight-providers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { readJsonBody } from "@/lib/request-body";
-import type { AnywhereSearchResult } from "@/lib/types";
-import { anywhereSearchSchema } from "@/lib/validation";
+import { flexibleDateSearchSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
+function todayUtcDateString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Clamps the requested month's 1st to today, so picking the current month
+ * never searches already-past dates. */
+function resolveMonthStart(month: string): string {
+  const firstOfMonth = `${month}-01`;
+  const today = todayUtcDateString();
+  return firstOfMonth > today ? firstOfMonth : today;
+}
+
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request.headers);
-  const rateLimit = checkRateLimit(`anywhere:${ip}`, { limit: 6, windowMs: 60_000 });
+  // Same budget as Anywhere search — this fans out to multiple dates too.
+  const rateLimit = checkRateLimit(`flexible-dates:${ip}`, { limit: 6, windowMs: 60_000 });
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: "Too many Anywhere searches. Please wait a moment and try again." },
+      { error: "Too many flexible-date searches. Please wait a moment and try again." },
       { status: 429 }
     );
   }
@@ -25,7 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: body.error }, { status: 400 });
   }
 
-  const parsed = anywhereSearchSchema.safeParse(body.data);
+  const parsed = flexibleDateSearchSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid search parameters", details: z.treeifyError(parsed.error) },
@@ -34,30 +50,31 @@ export async function POST(request: NextRequest) {
   }
 
   const input = parsed.data;
+  const monthStart = resolveMonthStart(input.month);
 
-  const cacheKey = buildAnywhereCacheKey({
+  const cacheKey = buildFlexibleDateCacheKey({
     origin: input.origin,
-    departureDate: input.departureDate,
-    returnDate: input.returnDate,
+    destination: input.destination,
+    monthStart,
+    tripDurationDays: input.tripDurationDays,
     adults: input.adults,
     children: input.children,
-    maximumPrice: input.maximumPrice,
     cabinClass: input.cabinClass,
   });
 
-  const cached = flightSearchCache.get(cacheKey) as AnywhereSearchResult | undefined;
+  const cached = flightSearchCache.get(cacheKey) as FlexibleDateSearchResult | undefined;
   if (cached) {
     return NextResponse.json(cached);
   }
 
   try {
     const provider = getFlightProvider();
-    const result = await searchAnywhere(provider, {
+    const result = await searchFlexibleDates(provider, {
       origin: input.origin,
-      departureDate: input.departureDate,
-      returnDate: input.returnDate,
+      destination: input.destination,
+      monthStart,
+      tripDurationDays: input.tripDurationDays,
       passengers: { adults: input.adults, children: input.children },
-      maximumPrice: input.maximumPrice,
       cabinClass: input.cabinClass,
     });
 
@@ -72,9 +89,9 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
-    console.error("Unexpected anywhere search error:", err);
+    console.error("Unexpected flexible-date search error:", err);
     return NextResponse.json(
-      { error: "Something went wrong while checking destinations. Please try again." },
+      { error: "Something went wrong while checking dates. Please try again." },
       { status: 500 }
     );
   }
